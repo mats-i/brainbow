@@ -1,3 +1,26 @@
+/* Synk-indikator till vänster om användare */
+.sync-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+    border: 2px solid #e0e0e0;
+    background: #e0e0e0;
+    transition: background 0.2s, border 0.2s;
+}
+.sync-indicator-synced {
+    background: #2e7d2e;
+    border-color: #a5d6a7;
+}
+.sync-indicator-syncing {
+    background: #ef6c00;
+    border-color: #ffe0b2;
+}
+.sync-indicator-error {
+    background: #c62828;
+    border-color: #ffcdd2;
+}
 /* Reset and base styles */
 * {
     margin: 0;

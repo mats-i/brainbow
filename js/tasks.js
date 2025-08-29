@@ -27,12 +27,25 @@ function setOperationLoading(operation, loading) {
 
 function updateLoadingUI() {
     // Update sync status based on loading state
+    const indicator = document.getElementById('sync-indicator');
     if (!navigator.onLine) {
         updateSyncStatus('error', 'Offline-läge – ändringar sparas lokalt');
+        if (indicator) {
+            indicator.className = 'sync-indicator sync-indicator-error';
+            indicator.title = 'Offline – ändringar sparas lokalt';
+        }
     } else if (isLoading) {
         updateSyncStatus('syncing', 'Synkar...');
+        if (indicator) {
+            indicator.className = 'sync-indicator sync-indicator-syncing';
+            indicator.title = 'Synkar med server...';
+        }
     } else {
         updateSyncStatus('synced', 'Synkad');
+        if (indicator) {
+            indicator.className = 'sync-indicator sync-indicator-synced';
+            indicator.title = 'Synkad';
+        }
     }
 }
 
