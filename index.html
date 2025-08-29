@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AGoodApp - Task & Notes Manager</title>
+    <title>Brainbow - connecting humans</title>
     <style>
         * {
             margin: 0;
@@ -507,8 +507,8 @@
     <!-- Login Screen -->
     <div id="login-screen" class="login-screen">
         <div class="login-card">
-            <h1 class="login-title">AGoodApp</h1>
-            <p class="login-subtitle">Din personliga task & notes manager</p>
+            <h1 class="login-title">Brainbow</h1>
+            <p class="login-subtitle">Connecting humans</p>
             
             <div id="login-form">
                 <div class="form-group">
@@ -536,7 +536,7 @@
         <!-- Sidebar -->
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h1>AGoodApp</h1>
+                <h1>Brainbow</h1>
                 <button class="hamburger-btn" onclick="toggleSidebar()">☰</button>
             </div>
             
@@ -674,7 +674,7 @@
             }
 
             // Check if user already exists
-            const users = JSON.parse(localStorage.getItem('agoodapp_users') || '{}');
+            const users = JSON.parse(localStorage.getItem('brainbow_users') || '{}');
             if (users[email]) {
                 showMessage('En användare med denna email finns redan');
                 return;
@@ -688,7 +688,7 @@
                 created: new Date().toISOString()
             };
 
-            localStorage.setItem('agoodapp_users', JSON.stringify(users));
+            localStorage.setItem('brainbow_users', JSON.stringify(users));
             showMessage('Konto skapat! Du kan nu logga in.', 'success');
         }
 
@@ -701,7 +701,7 @@
                 return;
             }
 
-            const users = JSON.parse(localStorage.getItem('agoodapp_users') || '{}');
+            const users = JSON.parse(localStorage.getItem('brainbow_users') || '{}');
             const user = users[email];
 
             if (!user || user.password !== hashPassword(password)) {
@@ -711,7 +711,7 @@
 
             // Login successful
             currentUser = user;
-            localStorage.setItem('agoodapp_current_user', JSON.stringify(user));
+            localStorage.setItem('brainbow_current_user', JSON.stringify(user));
             showMainApp();
             loadTasks();
         }
@@ -719,7 +719,7 @@
         function logout() {
             currentUser = null;
             tasks = [];
-            localStorage.removeItem('agoodapp_current_user');
+            localStorage.removeItem('brainbow_current_user');
             showLoginScreen();
             hideUserMenu();
         }
@@ -761,16 +761,16 @@
         // Task Management
         function loadTasks() {
             if (!currentUser) return;
-            
-            const userTasks = localStorage.getItem(`agoodapp_tasks_${currentUser.email}`);
+
+            const userTasks = localStorage.getItem(`brainbow_tasks_${currentUser.email}`);
             tasks = userTasks ? JSON.parse(userTasks) : [];
             renderTasks();
         }
 
         function saveTasks() {
             if (!currentUser) return;
-            
-            localStorage.setItem(`agoodapp_tasks_${currentUser.email}`, JSON.stringify(tasks));
+
+            localStorage.setItem(`brainbow_tasks_${currentUser.email}`, JSON.stringify(tasks));
         }
 
         function generateId() {
@@ -905,7 +905,7 @@
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
             // Check if user is already logged in
-            const savedUser = localStorage.getItem('agoodapp_current_user');
+            const savedUser = localStorage.getItem('brainbow_current_user');
             if (savedUser) {
                 currentUser = JSON.parse(savedUser);
                 showMainApp();
