@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Brainbow - connecting humans</title>
+    <title>Brainbow - Task & Notes Manager</title>
     <style>
         * {
             margin: 0;
@@ -132,6 +132,11 @@
             text-align: center;
         }
 
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
         /* App Container */
         .app-container {
             display: flex;
@@ -220,7 +225,17 @@
             flex: 1;
         }
 
-        .sidebar.collapsed .project-item .name {
+        .project-count {
+            background: rgba(0, 0, 0, 0.1);
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 11px;
+            min-width: 16px;
+            text-align: center;
+        }
+
+        .sidebar.collapsed .project-item .name,
+        .sidebar.collapsed .project-count {
             display: none;
         }
 
@@ -273,6 +288,31 @@
             color: white;
             font-weight: 600;
             font-size: 12px;
+        }
+
+        .sync-status {
+            position: absolute;
+            top: 16px;
+            right: 200px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        .sync-status.synced {
+            background: #e8f5e8;
+            color: #2e7d2e;
+        }
+
+        .sync-status.syncing {
+            background: #fff3e0;
+            color: #ef6c00;
+        }
+
+        .sync-status.error {
+            background: #ffebee;
+            color: #c62828;
         }
 
         .dropdown {
@@ -356,10 +396,6 @@
             display: flex;
             gap: 12px;
             margin-bottom: 16px;
-        }
-
-        .form-group {
-            flex: 1;
         }
 
         .form-group input,
@@ -500,6 +536,10 @@
             .form-row {
                 flex-direction: column;
             }
+
+            .sync-status {
+                right: 140px;
+            }
         }
     </style>
 </head>
@@ -508,7 +548,7 @@
     <div id="login-screen" class="login-screen">
         <div class="login-card">
             <h1 class="login-title">Brainbow</h1>
-            <p class="login-subtitle">Connecting humans</p>
+            <p class="login-subtitle">Din personliga task & notes manager</p>
             
             <div id="login-form">
                 <div class="form-group">
@@ -544,14 +584,17 @@
                 <div class="project-item active" data-project="all">
                     <span class="icon">📋</span>
                     <span class="name">Alla uppgifter</span>
+                    <span class="project-count" id="count-all">0</span>
                 </div>
                 <div class="project-item" data-project="work">
                     <span class="icon">💼</span>
                     <span class="name">Arbete</span>
+                    <span class="project-count" id="count-work">0</span>
                 </div>
                 <div class="project-item" data-project="personal">
                     <span class="icon">🏠</span>
                     <span class="name">Personligt</span>
+                    <span class="project-count" id="count-personal">0</span>
                 </div>
             </div>
         </div>
@@ -560,6 +603,7 @@
         <div class="main-content">
             <div class="main-header">
                 <h2 id="main-title">Alla uppgifter</h2>
+                <div class="sync-status" id="sync-status">Ansluter...</div>
                 <div class="user-menu">
                     <div class="user-info" onclick="toggleUserMenu()">
                         <div class="user-avatar" id="user-avatar">U</div>
@@ -567,6 +611,7 @@
                     </div>
                     <div class="dropdown" id="user-dropdown">
                         <div class="dropdown-item" onclick="showProfile()">Profil</div>
+                        <div class="dropdown-item" onclick="exportData()">Exportera data</div>
                         <div class="dropdown-item danger" onclick="logout()">Logga ut</div>
                     </div>
                 </div>
@@ -621,13 +666,23 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.min.js"></script>
     <script>
-        // Simple Authentication System using localStorage
+        // Supabase configuration
+        const SUPABASE_URL = 'https://tazwiywfzpmyqbmmkhpc.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRhendpeXdmenBteXFibW1raHBjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxOTg2NzMsImV4cCI6MjA3MTc3NDY3M30.GwC80boqAj4Z78qt3BIG-iau1QJuZiFe058vWtFBCxg';
+        
+        // Initialize Supabase client
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // Global variables
         let currentUser = null;
+        let userProfile = null;
         let tasks = [];
         let currentProject = 'all';
+        let isLoading = false;
 
-        // Authentication functions
+        // Utility functions
         function showMessage(message, type = 'error') {
             const messageEl = document.getElementById('auth-message');
             messageEl.textContent = message;
@@ -635,36 +690,129 @@
             setTimeout(() => {
                 messageEl.textContent = '';
                 messageEl.className = '';
-            }, 3000);
+            }, 4000);
         }
 
-        function hashPassword(password) {
-            // Simple hash function (not secure for production!)
-            let hash = 0;
-            for (let i = 0; i < password.length; i++) {
-                const char = password.charCodeAt(i);
-                hash = ((hash << 5) - hash) + char;
-                hash = hash & hash; // Convert to 32bit integer
+        function setLoading(loading) {
+            isLoading = loading;
+            const form = document.getElementById('login-form');
+            if (loading) {
+                form.classList.add('loading');
+            } else {
+                form.classList.remove('loading');
             }
-            return hash.toString();
         }
 
-        function validateEmail(email) {
-            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        function updateSyncStatus(status, message) {
+            const statusEl = document.getElementById('sync-status');
+            if (statusEl) {
+                statusEl.textContent = message;
+                statusEl.className = `sync-status ${status}`;
+                
+                if (status === 'synced') {
+                    setTimeout(() => {
+                        statusEl.style.opacity = '0';
+                        setTimeout(() => statusEl.style.display = 'none', 300);
+                    }, 2000);
+                }
+            }
         }
 
-        function signup() {
+        // Authentication functions
+        async function initAuth() {
+            console.log('Initializing authentication...');
+            updateSyncStatus('syncing', 'Ansluter...');
+            
+            try {
+                // Check if user is already logged in
+                const { data: { session } } = await supabase.auth.getSession();
+                
+                if (session) {
+                    currentUser = session.user;
+                    await loadUserProfile();
+                    showMainApp();
+                    await loadTasks();
+                    updateSyncStatus('synced', 'Ansluten');
+                } else {
+                    showLoginScreen();
+                }
+                
+                // Listen for auth changes
+                supabase.auth.onAuthStateChange(async (event, session) => {
+                    console.log('Auth state changed:', event);
+                    
+                    if (event === 'SIGNED_IN' && session) {
+                        currentUser = session.user;
+                        await loadUserProfile();
+                        showMainApp();
+                        await loadTasks();
+                        updateSyncStatus('synced', 'Ansluten');
+                    } else if (event === 'SIGNED_OUT') {
+                        currentUser = null;
+                        userProfile = null;
+                        tasks = [];
+                        showLoginScreen();
+                    }
+                });
+            } catch (error) {
+                console.error('Auth initialization error:', error);
+                updateSyncStatus('error', 'Anslutningsfel');
+                showLoginScreen();
+            }
+        }
+
+        async function loadUserProfile() {
+            if (!currentUser) return;
+            
+            try {
+                // Try to get existing profile
+                const { data: profile, error } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', currentUser.id)
+                    .single();
+                    
+                if (error && error.code === 'PGRST116') {
+                    // Profile doesn't exist, create one
+                    const newProfile = {
+                        id: currentUser.id,
+                        email: currentUser.email,
+                        full_name: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0]
+                    };
+                    
+                    const { data: createdProfile, error: createError } = await supabase
+                        .from('profiles')
+                        .insert(newProfile)
+                        .select()
+                        .single();
+                        
+                    if (createError) throw createError;
+                    userProfile = createdProfile;
+                } else if (error) {
+                    throw error;
+                } else {
+                    userProfile = profile;
+                }
+                
+                updateUserInfo();
+            } catch (error) {
+                console.error('Error loading user profile:', error);
+                // Create basic profile from user data
+                userProfile = {
+                    id: currentUser.id,
+                    email: currentUser.email,
+                    full_name: currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0]
+                };
+                updateUserInfo();
+            }
+        }
+
+        async function signup() {
             const email = document.getElementById('login-email').value.trim();
             const password = document.getElementById('login-password').value;
 
-            // Validation
             if (!email || !password) {
                 showMessage('Fyll i både email och lösenord');
-                return;
-            }
-
-            if (!validateEmail(email)) {
-                showMessage('Ange en giltig email-adress');
                 return;
             }
 
@@ -673,26 +821,29 @@
                 return;
             }
 
-            // Check if user already exists
-            const users = JSON.parse(localStorage.getItem('brainbow_users') || '{}');
-            if (users[email]) {
-                showMessage('En användare med denna email finns redan');
-                return;
+            setLoading(true);
+            
+            try {
+                const { error } = await supabase.auth.signUp({
+                    email: email,
+                    password: password,
+                    options: {
+                        emailRedirectTo: window.location.href
+                    }
+                });
+                
+                if (error) throw error;
+                
+                showMessage('Konto skapat! Kolla din email för att bekräfta kontot.', 'success');
+            } catch (error) {
+                console.error('Signup error:', error);
+                showMessage('Fel vid kontoskapande: ' + error.message);
             }
-
-            // Create new user
-            users[email] = {
-                email: email,
-                password: hashPassword(password),
-                name: email.split('@')[0],
-                created: new Date().toISOString()
-            };
-
-            localStorage.setItem('brainbow_users', JSON.stringify(users));
-            showMessage('Konto skapat! Du kan nu logga in.', 'success');
+            
+            setLoading(false);
         }
 
-        function signin() {
+        async function signin() {
             const email = document.getElementById('login-email').value.trim();
             const password = document.getElementById('login-password').value;
 
@@ -701,27 +852,33 @@
                 return;
             }
 
-            const users = JSON.parse(localStorage.getItem('brainbow_users') || '{}');
-            const user = users[email];
-
-            if (!user || user.password !== hashPassword(password)) {
-                showMessage('Fel email eller lösenord');
-                return;
+            setLoading(true);
+            
+            try {
+                const { error } = await supabase.auth.signInWithPassword({
+                    email: email,
+                    password: password
+                });
+                
+                if (error) throw error;
+                
+            } catch (error) {
+                console.error('Signin error:', error);
+                showMessage('Fel vid inloggning: ' + error.message);
+                setLoading(false);
             }
-
-            // Login successful
-            currentUser = user;
-            localStorage.setItem('brainbow_current_user', JSON.stringify(user));
-            showMainApp();
-            loadTasks();
         }
 
-        function logout() {
-            currentUser = null;
-            tasks = [];
-            localStorage.removeItem('brainbow_current_user');
-            showLoginScreen();
-            hideUserMenu();
+        async function logout() {
+            try {
+                const { error } = await supabase.auth.signOut();
+                if (error) throw error;
+                
+                hideUserMenu();
+            } catch (error) {
+                console.error('Error signing out:', error);
+                showMessage('Fel vid utloggning: ' + error.message);
+            }
         }
 
         function showLoginScreen() {
@@ -729,19 +886,20 @@
             document.getElementById('app-container').style.display = 'none';
             document.getElementById('login-email').value = '';
             document.getElementById('login-password').value = '';
+            document.getElementById('sync-status').style.display = 'none';
         }
 
         function showMainApp() {
             document.getElementById('login-screen').style.display = 'none';
             document.getElementById('app-container').style.display = 'flex';
-            updateUserInfo();
+            document.getElementById('sync-status').style.display = 'block';
         }
 
         function updateUserInfo() {
-            if (!currentUser) return;
+            if (!userProfile) return;
             
-            document.getElementById('user-name').textContent = currentUser.name;
-            document.getElementById('user-avatar').textContent = currentUser.name.charAt(0).toUpperCase();
+            document.getElementById('user-name').textContent = userProfile.full_name || userProfile.email;
+            document.getElementById('user-avatar').textContent = (userProfile.full_name || userProfile.email).charAt(0).toUpperCase();
         }
 
         function toggleUserMenu() {
@@ -755,22 +913,71 @@
 
         function showProfile() {
             hideUserMenu();
-            alert(`Profil:\nEmail: ${currentUser.email}\nNamn: ${currentUser.name}\nMedlem sedan: ${new Date(currentUser.created).toLocaleDateString('sv-SE')}`);
+            if (userProfile) {
+                alert(`Profil:\nEmail: ${userProfile.email}\nNamn: ${userProfile.full_name}\nMedlem sedan: ${new Date(userProfile.created_at).toLocaleDateString('sv-SE')}`);
+            }
         }
 
         // Task Management
-        function loadTasks() {
+        async function loadTasks() {
             if (!currentUser) return;
-
-            const userTasks = localStorage.getItem(`brainbow_tasks_${currentUser.email}`);
-            tasks = userTasks ? JSON.parse(userTasks) : [];
-            renderTasks();
+            
+            try {
+                updateSyncStatus('syncing', 'Synkar...');
+                
+                const { data, error } = await supabase
+                    .from('tasks')
+                    .select('*')
+                    .eq('user_id', currentUser.id)
+                    .order('created_at', { ascending: false });
+                    
+                if (error) throw error;
+                
+                tasks = data || [];
+                console.log('Loaded', tasks.length, 'tasks');
+                renderTasks();
+                updateProjectCounts();
+                updateSyncStatus('synced', 'Synkad');
+            } catch (error) {
+                console.error('Error loading tasks:', error);
+                updateSyncStatus('error', 'Syncfel');
+                
+                // Fallback to localStorage
+                const userTasks = localStorage.getItem(`brainbow_tasks_${currentUser.id}`);
+                tasks = userTasks ? JSON.parse(userTasks) : [];
+                renderTasks();
+                updateProjectCounts();
+            }
         }
 
-        function saveTasks() {
+        async function saveTasks() {
             if (!currentUser) return;
-
-            localStorage.setItem(`brainbow_tasks_${currentUser.email}`, JSON.stringify(tasks));
+            
+            try {
+                updateSyncStatus('syncing', 'Sparar...');
+                
+                // Save to localStorage as backup
+                localStorage.setItem(`brainbow_tasks_${currentUser.id}`, JSON.stringify(tasks));
+                
+                // Save to Supabase
+                for (let task of tasks) {
+                    if (!task.user_id) {
+                        task.user_id = currentUser.id;
+                    }
+                    
+                    const { error } = await supabase
+                        .from('tasks')
+                        .upsert(task);
+                        
+                    if (error) throw error;
+                }
+                
+                console.log('Tasks saved successfully');
+                updateSyncStatus('synced', 'Sparad');
+            } catch (error) {
+                console.error('Error saving tasks:', error);
+                updateSyncStatus('error', 'Sparfel');
+            }
         }
 
         function generateId() {
@@ -790,7 +997,7 @@
             document.getElementById('task-deadline').value = '';
         }
 
-        function saveTask() {
+        async function saveTask() {
             const title = document.getElementById('task-title').value.trim();
             if (!title) return;
 
@@ -801,30 +1008,48 @@
                 priority: document.getElementById('task-priority').value,
                 deadline: document.getElementById('task-deadline').value || null,
                 completed: false,
-                created: new Date().toISOString()
+                completed_at: null,
+                created_at: new Date().toISOString(),
+                user_id: currentUser.id
             };
 
             tasks.unshift(task);
-            saveTasks();
+            await saveTasks();
             renderTasks();
+            updateProjectCounts();
             hideTaskForm();
         }
 
-        function toggleTaskComplete(taskId) {
+        async function toggleTaskComplete(taskId) {
             const task = tasks.find(t => t.id === taskId);
             if (task) {
                 task.completed = !task.completed;
-                task.completedAt = task.completed ? new Date().toISOString() : null;
-                saveTasks();
+                task.completed_at = task.completed ? new Date().toISOString() : null;
+                await saveTasks();
                 renderTasks();
+                updateProjectCounts();
             }
         }
 
-        function deleteTask(taskId) {
+        async function deleteTask(taskId) {
             if (confirm('Är du säker på att du vill ta bort denna uppgift?')) {
+                // Delete from Supabase
+                try {
+                    const { error } = await supabase
+                        .from('tasks')
+                        .delete()
+                        .eq('id', taskId);
+                        
+                    if (error) throw error;
+                } catch (error) {
+                    console.error('Error deleting from Supabase:', error);
+                }
+                
+                // Remove from local array
                 tasks = tasks.filter(t => t.id !== taskId);
-                saveTasks();
+                localStorage.setItem(`brainbow_tasks_${currentUser.id}`, JSON.stringify(tasks));
                 renderTasks();
+                updateProjectCounts();
             }
         }
 
@@ -852,6 +1077,7 @@
                 li.className = `task-item ${task.completed ? 'completed' : ''}`;
                 
                 const isOverdue = task.deadline && new Date(task.deadline) < new Date() && !task.completed;
+                const deadlineText = task.deadline ? new Date(task.deadline).toLocaleDateString('sv-SE') : '';
                 
                 li.innerHTML = `
                     <div class="task-checkbox ${task.completed ? 'completed' : ''}" onclick="toggleTaskComplete('${task.id}')">
@@ -861,8 +1087,8 @@
                         <div class="task-title">${task.title}</div>
                         <div class="task-meta">
                             ${task.priority !== 'medium' ? `Prioritet: ${task.priority} • ` : ''}
-                            ${task.deadline ? `Deadline: ${new Date(task.deadline).toLocaleDateString('sv-SE')} ${isOverdue ? '(försenad)' : ''} • ` : ''}
-                            Skapad: ${new Date(task.created).toLocaleDateString('sv-SE')}
+                            ${deadlineText ? `Deadline: ${deadlineText} ${isOverdue ? '(försenad)' : ''} • ` : ''}
+                            Skapad: ${new Date(task.created_at).toLocaleDateString('sv-SE')}
                         </div>
                     </div>
                     <div class="task-actions">
@@ -870,6 +1096,21 @@
                     </div>
                 `;
                 taskList.appendChild(li);
+            });
+        }
+
+        function updateProjectCounts() {
+            const counts = {
+                all: tasks.length,
+                work: tasks.filter(t => t.project === 'work').length,
+                personal: tasks.filter(t => t.project === 'personal').length
+            };
+
+            Object.entries(counts).forEach(([project, count]) => {
+                const countEl = document.getElementById(`count-${project}`);
+                if (countEl) {
+                    countEl.textContent = count;
+                }
             });
         }
 
@@ -902,18 +1143,33 @@
             }
         }
 
+        // Export/Import functions
+        function exportData() {
+            hideUserMenu();
+            
+            const data = {
+                tasks: tasks,
+                profile: userProfile,
+                exported_at: new Date().toISOString(),
+                version: '1.0'
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `brainbow-backup-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            
+            URL.revokeObjectURL(url);
+        }
+
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
-            // Check if user is already logged in
-            const savedUser = localStorage.getItem('brainbow_current_user');
-            if (savedUser) {
-                currentUser = JSON.parse(savedUser);
-                showMainApp();
-                loadTasks();
-            } else {
-                showLoginScreen();
-            }
-
+            // Initialize authentication
+            initAuth();
+            
             // Event listeners
             document.getElementById('signin-btn').addEventListener('click', signin);
             document.getElementById('signup-btn').addEventListener('click', signup);
