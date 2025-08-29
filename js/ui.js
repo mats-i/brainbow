@@ -156,13 +156,19 @@ async function saveTaskFromSidebar() {
         return;
     }
 
+    let assigneeValue = getFieldValue('task-assignee');
+    if (assigneeValue === 'me' && window.currentUser && window.currentUser.id) {
+        assigneeValue = window.currentUser.id;
+    } else if (assigneeValue === '') {
+        assigneeValue = null;
+    }
     const taskData = {
         title: title.value.trim(),
         description: getFieldValue('task-description'),
         project: getFieldValue('task-project'),
         priority: getSelectedPriority(),
         deadline: getFieldValue('task-deadline') || null,
-        assignee: getFieldValue('task-assignee'),
+        assignee: assigneeValue,
         tags: getFieldValue('task-tags')
     };
 
