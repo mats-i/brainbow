@@ -81,32 +81,50 @@ async function loadTasks() {
     if (!currentUser) return;
     
     setOperationLoading('load', true);
-    
+
     try {
-        const { data, error } = await supabase
-            .from('tasks')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .order('created_at', { ascending: false });
-            
-        if (error) throw error;
-        
-        tasks = data || [];
-        saveToLocalStorage();
-        renderTasks();
-        updateProjectCounts();
-        
-        console.log(`Loaded ${tasks.length} tasks successfully`);
-        
+        // Alltid försök ladda från Supabase först om online
+        if (navigator.onLine) {
+            const { data, error } = await supabase
+                .from('tasks')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            tasks = data || [];
+            saveToLocalStorage();
+            renderTasks();
+            updateProjectCounts();
+            console.log(`Loaded ${tasks.length} tasks successfully`);
+        } else {
+            // Endast om offline: ladda från localStorage
+            const userTasks = localStorage.getItem(`brainbow_tasks_${currentUser.id}`);
+            if (userTasks) {
+                try {
+                    tasks = JSON.parse(userTasks);
+                    console.log(`Loaded ${tasks.length} tasks from localStorage`);
+                } catch (parseError) {
+                    console.error('Error parsing localStorage tasks:', parseError);
+                    tasks = [];
+                }
+            } else {
+                tasks = [];
+            }
+            renderTasks();
+            updateProjectCounts();
+            updateSyncStatus('error', 'Offline-läge');
+            showNotification('Kunde inte ansluta till servern. Arbetar offline.', 'error');
+        }
     } catch (error) {
         console.error('Error loading tasks from Supabase:', error);
-        
-        // Fallback to localStorage
+        // Om Supabase misslyckas, ladda från localStorage
         const userTasks = localStorage.getItem(`brainbow_tasks_${currentUser.id}`);
         if (userTasks) {
             try {
                 tasks = JSON.parse(userTasks);
-                console.log(`Loaded ${tasks.length} tasks from localStorage`);
+                console.log(`Loaded ${tasks.length} tasks from localStorage (fallback)`);
             } catch (parseError) {
                 console.error('Error parsing localStorage tasks:', parseError);
                 tasks = [];
@@ -114,14 +132,10 @@ async function loadTasks() {
         } else {
             tasks = [];
         }
-        
         renderTasks();
         updateProjectCounts();
         updateSyncStatus('error', 'Offline-läge');
-        
-        // Show user-friendly error
         showNotification('Kunde inte ansluta till servern. Arbetar offline.', 'error');
-        
     } finally {
         setOperationLoading('load', false);
     }
@@ -133,15 +147,18 @@ async function createTask(taskData) {
     }
 
     const tempId = generateId();
+    console.log('createTask: currentUser', currentUser);
+    console.log('createTask: taskData', taskData);
     const newTask = {
         id: tempId,
         ...taskData,
-        title: taskData.title.trim(),
+        title: taskData.title?.trim(),
         completed: false,
         completed_at: null,
         created_at: new Date().toISOString(),
-        user_id: currentUser.id
+        user_id: currentUser?.id
     };
+    console.log('createTask: newTask', JSON.stringify(newTask, null, 2));
 
     // Optimistic update - add to UI immediately
     tasks.unshift(newTask);
@@ -161,14 +178,16 @@ async function createTask(taskData) {
 
     try {
         const result = await retryOperation(async () => {
-            console.log('Supabase INSERT newTask:', newTask);
+            console.log('Supabase INSERT newTask:', JSON.stringify(newTask, null, 2));
             const { data, error } = await supabase
                 .from('tasks')
                 .insert(newTask)
                 .select()
                 .single();
-            
-            if (error) throw error;
+            if (error) {
+                console.error('Supabase insert error:', error);
+                throw error;
+            }
             return data;
         });
 
@@ -463,14 +482,20 @@ function renderTasks() {
         return;
     }
 
-    filteredTasks.forEach(task => {
+    filteredTasks.forEach(async task => {
         const li = document.createElement('li');
         li.className = `task-item ${task.completed ? 'completed' : ''}`;
         li.onclick = () => editTask(task.id);
-        
+
         const isOverdue = task.deadline && new Date(task.deadline) < new Date() && !task.completed;
         const deadlineText = task.deadline ? new Date(task.deadline).toLocaleDateString('sv-SE') : '';
-        
+
+        // Hämta assignee-namn om det finns
+        let assigneeName = '';
+        if (task.assignee) {
+            assigneeName = await getAssigneeName(task.assignee);
+        }
+
         li.innerHTML = `
             <div class="task-checkbox ${task.completed ? 'completed' : ''}" onclick="event.stopPropagation(); toggleTaskComplete('${task.id}')">
                 ${task.completed ? '✓' : ''}
@@ -481,6 +506,7 @@ function renderTasks() {
                     ${task.priority !== 'medium' ? `Prioritet: ${task.priority} • ` : ''}
                     ${deadlineText ? `Deadline: ${deadlineText} ${isOverdue ? '(försenad)' : ''} • ` : ''}
                     Skapad: ${new Date(task.created_at).toLocaleDateString('sv-SE')}
+                    ${assigneeName ? `• Tilldelad: ${escapeHtml(assigneeName)}` : ''}
                 </div>
             </div>
             <div class="task-actions">
@@ -489,6 +515,28 @@ function renderTasks() {
         `;
         taskList.appendChild(li);
     });
+// Cache för användar-id till namn
+const assigneeNameCache = {};
+
+// Hämta användarnamn från Supabase/profiles
+async function getAssigneeName(userId) {
+    if (!userId) return '';
+    if (assigneeNameCache[userId]) return assigneeNameCache[userId];
+    try {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', userId)
+            .single();
+        if (error) throw error;
+        const name = data.full_name || data.email || userId;
+        assigneeNameCache[userId] = name;
+        return name;
+    } catch (err) {
+        console.error('Kunde inte hämta användarnamn:', err);
+        return userId;
+    }
+}
 }
 
 function updateProjectCounts() {

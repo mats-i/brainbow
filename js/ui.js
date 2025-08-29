@@ -12,6 +12,9 @@ function openRightSidebar(taskId = null) {
 
     if (!sidebar || !overlay || !container) return;
 
+    // Ladda användarlistan till assignee-dropdown
+    populateAssigneeDropdown();
+
     if (taskId) {
         // Edit mode
         isEditMode = true;
@@ -27,6 +30,32 @@ function openRightSidebar(taskId = null) {
         if (deleteBtn) deleteBtn.style.display = 'none';
         clearSidebarForm();
     }
+// Hämta användarlistan från Supabase och fyll assignee-dropdown
+async function populateAssigneeDropdown() {
+    const select = document.getElementById('task-assignee');
+    if (!select) return;
+    // Spara nuvarande värde om det finns
+    const prevValue = select.value;
+    select.innerHTML = '<option value="">Välj användare...</option>';
+    try {
+        const { data, error } = await supabase
+            .from('profiles')
+            .select('id, full_name, email');
+        if (error) throw error;
+        data.forEach(user => {
+            const option = document.createElement('option');
+            option.value = user.id;
+            option.textContent = user.full_name || user.email;
+            select.appendChild(option);
+        });
+        // Återställ tidigare värde om det finns
+        if (prevValue) select.value = prevValue;
+    } catch (err) {
+        console.error('Kunde inte hämta användarlista:', err);
+        // Fallback: visa bara "Mig själv"
+        select.innerHTML = '<option value="me">Mig själv</option>';
+    }
+}
 
     sidebar.classList.add('active');
     overlay.classList.add('active');
