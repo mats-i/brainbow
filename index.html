@@ -67,22 +67,30 @@
             <div class="main-header">
                 <h2 id="main-title">Alla uppgifter</h2>
                 <div class="sync-status" id="sync-status">Ansluter...</div>
-                <div class="user-menu">
-                    <div class="user-info" onclick="toggleUserMenu()">
-                        <span id="sync-indicator" class="sync-indicator sync-indicator-synced" title="Synkad"></span>
-                        <div class="user-avatar" id="user-avatar">U</div>
-                        <span id="user-name">User</span>
-                    </div>
-                    <div class="dropdown" id="user-dropdown">
-                        <div class="dropdown-item" onclick="showProfile()">Profil</div>
-                        <div class="dropdown-item" onclick="exportData()">Exportera data</div>
-                        <div class="dropdown-item danger" onclick="logout()">Logga ut</div>
+                <div style="display: flex; align-items: center; gap: 1rem;">
+                    <button class="add-task-btn" onclick="openRightSidebar()">+ Ny uppgift</button>
+                    <div class="user-menu">
+                        <div class="user-info" onclick="toggleUserMenu()">
+                            <span id="sync-indicator" class="sync-indicator sync-indicator-synced" title="Synkad"></span>
+                            <div class="user-avatar" id="user-avatar">U</div>
+                            <span id="user-name">User</span>
+                        </div>
+                        <div class="dropdown" id="user-dropdown">
+                            <div class="dropdown-item" onclick="showProfile()">Profil</div>
+                            <div class="dropdown-item" onclick="exportData()">Exportera data</div>
+                            <div class="dropdown-item danger" onclick="logout()">Logga ut</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div class="content-area">
-                <button class="add-task-btn" onclick="openRightSidebar()">+ Ny uppgift</button>
+                <div class="tabs" id="main-tabs" style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                    <button class="tab-btn active" data-tab="journal" onclick="selectTab('journal')">Journal</button>
+                    <button class="tab-btn" data-tab="calendar" onclick="selectTab('calendar')">Kalender</button>
+                    <button class="tab-btn" data-tab="who" onclick="selectTab('who')">Vem?</button>
+                    <button class="tab-btn" data-tab="projects" onclick="selectTab('projects')">Projekt</button>
+                </div>
                 <ul class="task-list" id="task-list">
                     <!-- Tasks will be populated here -->
                 </ul>

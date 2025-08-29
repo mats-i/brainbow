@@ -52,29 +52,39 @@ async function initAuth() {
     try {
         // Check if user is already logged in
         const { data: { session } } = await supabase.auth.getSession();
-        
         if (session) {
             currentUser = session.user;
+            window.currentUser = currentUser;
             await loadUserProfile();
             showMainApp();
-            await loadTasks();
+            showTaskLoader();
+            try {
+                await loadTasks();
+            } catch (e) {
+                console.error('Kunde inte ladda tasks vid inloggning:', e);
+            }
             updateSyncStatus('synced', 'Ansluten');
         } else {
             showLoginScreen();
         }
-        
         // Listen for auth changes
         supabase.auth.onAuthStateChange(async (event, session) => {
             console.log('Auth state changed:', event);
-            
             if (event === 'SIGNED_IN' && session) {
                 currentUser = session.user;
+                window.currentUser = currentUser;
                 await loadUserProfile();
                 showMainApp();
-                await loadTasks();
+                showTaskLoader();
+                try {
+                    await loadTasks();
+                } catch (e) {
+                    console.error('Kunde inte ladda tasks vid SIGNED_IN:', e);
+                }
                 updateSyncStatus('synced', 'Ansluten');
             } else if (event === 'SIGNED_OUT') {
                 currentUser = null;
+                window.currentUser = null;
                 userProfile = null;
                 tasks = [];
                 showLoginScreen();

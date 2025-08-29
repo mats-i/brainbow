@@ -1,3 +1,181 @@
+
+// Flikväxling för huvudflikarna
+window.selectTab = async function(tab) {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tab);
+    });
+    showTaskLoader();
+    try {
+        await window.loadTasks(); // Ladda alltid tasks på flikbyte
+    } catch (e) {
+        console.error('Kunde inte ladda tasks vid flikbyte:', e);
+    }
+    if (tab === 'calendar') {
+        renderTasksGroupedByDeadline();
+    } else if (tab === 'journal') {
+        renderTasks();
+    } else if (tab === 'who') {
+        renderTasksGroupedByAssignee();
+    } else if (tab === 'projects') {
+        await renderTasksGroupedByProject();
+    } else {
+        document.getElementById('task-list').innerHTML = '<li class="empty-state"><h3>Ingen vy implementerad ännu</h3></li>';
+    }
+// Rendera tasks grupperade per projekt, sorterade i deadline-ordning (för fliken Projekt)
+function renderTasksGroupedByProject() {
+    const taskList = document.getElementById('task-list');
+    if (!taskList) return;
+    taskList.innerHTML = '';
+    if (!window.tasks || window.tasks.length === 0) {
+        taskList.innerHTML = `<li class="empty-state"><h3>Inga uppgifter ännu</h3></li>`;
+        return;
+    }
+    // Filtrera på öppna (ej completed)
+    const openTasks = window.tasks.filter(task => !task.completed);
+    // Gruppera på projekt
+    const groups = {};
+    for (const task of openTasks) {
+        const key = task.project || 'Okänt projekt';
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(task);
+    }
+    // Sortera projekt alfabetiskt
+    const projectKeys = Object.keys(groups).sort();
+        for (const projectKey of projectKeys) {
+            const group = groups[projectKey];
+            // Sortera gruppen på deadline (null sist)
+            group.sort((a, b) => {
+                if (!a.deadline && !b.deadline) return 0;
+                if (!a.deadline) return 1;
+                if (!b.deadline) return -1;
+                return new Date(a.deadline) - new Date(b.deadline);
+            });
+            const groupHeader = document.createElement('li');
+            groupHeader.className = 'task-group-header';
+            groupHeader.textContent = projectKey;
+            taskList.appendChild(groupHeader);
+            for (const task of group) {
+                const li = document.createElement('li');
+                li.className = `task-item minimalist ${task.completed ? 'completed' : ''}`;
+                li.onclick = () => editTask(task.id);
+                let assigneeName = '';
+                if (task.assignee) {
+                    assigneeName = await window.getAssigneeName(task.assignee);
+                }
+                let metaParts = [];
+                if (task.priority !== 'medium') metaParts.push(`Prioritet: ${task.priority}`);
+                if (assigneeName) metaParts.push(escapeHtml(assigneeName));
+                if (task.deadline) metaParts.unshift(new Date(task.deadline).toLocaleDateString('sv-SE'));
+                li.innerHTML = `
+                    <span class="task-checkbox minimalist ${task.completed ? 'completed' : ''}" onclick="event.stopPropagation(); toggleTaskComplete('${task.id}')">${task.completed ? '✓' : ''}</span>
+                    <span class="task-title minimalist">${escapeHtml(task.title)}</span>
+                    <span class="task-meta minimalist">${metaParts.join(' • ')}</span>
+                    <span class="task-actions minimalist"><button class="task-action-btn" onclick="event.stopPropagation(); deleteTask('${task.id}')" title="Ta bort">🗑️</button></span>
+                `;
+                taskList.appendChild(li);
+            }
+        }
+}
+// Rendera tasks grupperade per tilldelad användare (för fliken Vem?)
+function renderTasksGroupedByAssignee() {
+    const taskList = document.getElementById('task-list');
+    if (!taskList) return;
+    taskList.innerHTML = '';
+    if (!window.tasks || window.tasks.length === 0) {
+        taskList.innerHTML = `<li class="empty-state"><h3>Inga uppgifter ännu</h3></li>`;
+        return;
+    }
+    // Filtrera på öppna (ej completed)
+    const openTasks = window.tasks.filter(task => !task.completed);
+    // Gruppera på assignee
+    const groups = {};
+    for (const task of openTasks) {
+        const key = task.assignee || 'Ingen tilldelad';
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(task);
+    }
+    // Hämta alla unika assignee-id och hämta namn
+    const assigneeIds = Object.keys(groups);
+    Promise.all(assigneeIds.map(id => id !== 'Ingen tilldelad' ? getAssigneeName(id) : Promise.resolve('Ingen tilldelad')))
+        .then(names => {
+            const idToName = {};
+            assigneeIds.forEach((id, i) => { idToName[id] = names[i]; });
+            // Sortera grupper efter namn
+            assigneeIds.sort((a, b) => idToName[a].localeCompare(idToName[b]));
+            assigneeIds.forEach(assigneeId => {
+                const group = groups[assigneeId];
+                const groupHeader = document.createElement('li');
+                groupHeader.className = 'task-group-header';
+                groupHeader.textContent = idToName[assigneeId];
+                taskList.appendChild(groupHeader);
+                group.forEach(task => {
+                    const li = document.createElement('li');
+                    li.className = `task-item minimalist ${task.completed ? 'completed' : ''}`;
+                    li.onclick = () => editTask(task.id);
+                    li.innerHTML = `
+                        <span class="task-checkbox minimalist ${task.completed ? 'completed' : ''}" onclick="event.stopPropagation(); toggleTaskComplete('${task.id}')">${task.completed ? '✓' : ''}</span>
+                        <span class="task-title minimalist">${escapeHtml(task.title)}</span>
+                        <span class="task-meta minimalist"></span>
+                        <span class="task-actions minimalist"><button class="task-action-btn" onclick="event.stopPropagation(); deleteTask('${task.id}')" title="Ta bort">🗑️</button></span>
+                    `;
+                    taskList.appendChild(li);
+                });
+            });
+        });
+}
+}
+
+// Rendera tasks grupperade på deadline (endast för kalenderfliken)
+function renderTasksGroupedByDeadline() {
+    const taskList = document.getElementById('task-list');
+    if (!taskList) return;
+    taskList.innerHTML = '';
+    if (!window.tasks || window.tasks.length === 0) {
+        taskList.innerHTML = `<li class="empty-state"><h3>Inga uppgifter ännu</h3></li>`;
+        return;
+    }
+    // Gruppera tasks på deadline (YYYY-MM-DD)
+    const groups = {};
+    window.tasks.forEach(task => {
+        const key = task.deadline ? task.deadline : 'Ingen deadline';
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(task);
+    });
+    // Sortera grupper (datum i ordning, "Ingen deadline" sist)
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+        if (a === 'Ingen deadline') return 1;
+        if (b === 'Ingen deadline') return -1;
+        return new Date(a) - new Date(b);
+    });
+    sortedKeys.forEach(dateKey => {
+        const group = groups[dateKey];
+        const dateLabel = dateKey === 'Ingen deadline' ? 'Ingen deadline' : new Date(dateKey).toLocaleDateString('sv-SE');
+        const groupHeader = document.createElement('li');
+        groupHeader.className = 'task-group-header';
+        groupHeader.textContent = dateLabel;
+        taskList.appendChild(groupHeader);
+        group.forEach(async task => {
+            const li = document.createElement('li');
+            li.className = `task-item minimalist ${task.completed ? 'completed' : ''}`;
+            li.onclick = () => editTask(task.id);
+            let assigneeName = '';
+            if (task.assignee) {
+                assigneeName = await getAssigneeName(task.assignee);
+            }
+            let metaParts = [];
+            if (task.priority !== 'medium') metaParts.push(`Prioritet: ${task.priority}`);
+            if (assigneeName) metaParts.push(escapeHtml(assigneeName));
+            if (task.deadline) metaParts.unshift(new Date(task.deadline).toLocaleDateString('sv-SE'));
+            li.innerHTML = `
+                <span class="task-checkbox minimalist ${task.completed ? 'completed' : ''}" onclick="event.stopPropagation(); toggleTaskComplete('${task.id}')">${task.completed ? '✓' : ''}</span>
+                <span class="task-title minimalist">${escapeHtml(task.title)}</span>
+                <span class="task-meta minimalist">${metaParts.join(' • ')}</span>
+                <span class="task-actions minimalist"><button class="task-action-btn" onclick="event.stopPropagation(); deleteTask('${task.id}')" title="Ta bort">🗑️</button></span>
+            `;
+            taskList.appendChild(li);
+        });
+    });
+}
 // Right sidebar state
 let currentEditingTask = null;
 let isEditMode = false;
@@ -29,6 +207,13 @@ function openRightSidebar(taskId = null) {
         if (title) title.textContent = 'Ny uppgift';
         if (deleteBtn) deleteBtn.style.display = 'none';
         clearSidebarForm();
+        // Sätt assignee till currentUser.id som default om inloggad
+        setTimeout(() => {
+            const assigneeSelect = document.getElementById('task-assignee');
+            if (assigneeSelect && window.currentUser && window.currentUser.id) {
+                assigneeSelect.value = window.currentUser.id;
+            }
+        }, 200);
     }
 // Hämta användarlistan från Supabase och fyll assignee-dropdown
 async function populateAssigneeDropdown() {
@@ -141,6 +326,7 @@ function setPriority(priority) {
         if (option.dataset.priority === priority) {
             option.classList.add('selected');
         }
+                        if (task.deadline) metaParts.unshift(new Date(task.deadline).toLocaleDateString('sv-SE'));
     });
 }
 
@@ -157,11 +343,14 @@ async function saveTaskFromSidebar() {
     }
 
     let assigneeValue = getFieldValue('task-assignee');
+    // Sätt alltid assignee till currentUser.id om "me" är valt
     if (assigneeValue === 'me' && window.currentUser && window.currentUser.id) {
         assigneeValue = window.currentUser.id;
-    } else if (assigneeValue === '') {
+    } else if (!assigneeValue || assigneeValue === '') {
         assigneeValue = null;
     }
+
+    // Extra säkerhet: om taskData.assignee fortfarande är 'me', byt ut det
     const taskData = {
         title: title.value.trim(),
         description: getFieldValue('task-description'),
@@ -171,6 +360,9 @@ async function saveTaskFromSidebar() {
         assignee: assigneeValue,
         tags: getFieldValue('task-tags')
     };
+    if (taskData.assignee === 'me' && window.currentUser && window.currentUser.id) {
+        taskData.assignee = window.currentUser.id;
+    }
 
     try {
         if (isEditMode && currentEditingTask) {

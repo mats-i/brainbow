@@ -1,3 +1,7 @@
+
+// Cache för användar-id till namn (måste ligga överallt där getAssigneeName används)
+const assigneeNameCache = {};
+
 // Global task state
 let tasks = [];
 let currentProject = 'all';
@@ -81,6 +85,7 @@ async function loadTasks() {
     if (!currentUser) return;
     
     setOperationLoading('load', true);
+    showTaskLoader();
 
     try {
         // Alltid försök ladda från Supabase först om online
@@ -91,6 +96,7 @@ async function loadTasks() {
                 .eq('user_id', currentUser.id)
                 .order('created_at', { ascending: false });
 
+            console.log('Supabase loadTasks response:', { data, error });
             if (error) throw error;
 
             tasks = data || [];
@@ -138,7 +144,18 @@ async function loadTasks() {
         showNotification('Kunde inte ansluta till servern. Arbetar offline.', 'error');
     } finally {
         setOperationLoading('load', false);
+        hideTaskLoader();
     }
+// Loader helpers
+function showTaskLoader() {
+    const taskList = document.getElementById('task-list');
+    if (taskList) {
+        taskList.innerHTML = '<li class="loading-state"><span>Laddar aktiviteter...</span></li>';
+    }
+}
+function hideTaskLoader() {
+    // Gör inget, renderTasks() skriver över listan
+}
 }
 
 async function createTask(taskData) {
@@ -149,14 +166,14 @@ async function createTask(taskData) {
     const tempId = generateId();
     console.log('createTask: currentUser', currentUser);
     console.log('createTask: taskData', taskData);
+    // Skicka INTE med user_id, låt RLS sätta det
     const newTask = {
         id: tempId,
         ...taskData,
         title: taskData.title?.trim(),
         completed: false,
         completed_at: null,
-        created_at: new Date().toISOString(),
-        user_id: currentUser?.id
+        created_at: new Date().toISOString()
     };
     console.log('createTask: newTask', JSON.stringify(newTask, null, 2));
 
@@ -185,7 +202,7 @@ async function createTask(taskData) {
                 .select()
                 .single();
             if (error) {
-                console.error('Supabase insert error:', error);
+                console.error('Supabase insert error:', JSON.stringify(error, null, 2));
                 throw error;
             }
             return data;
@@ -467,6 +484,7 @@ function renderTasks() {
     
     taskList.innerHTML = '';
 
+    window.tasks = tasks;
     let filteredTasks = tasks;
     if (currentProject !== 'all') {
         filteredTasks = tasks.filter(task => task.project === currentProject);
@@ -484,42 +502,33 @@ function renderTasks() {
 
     filteredTasks.forEach(async task => {
         const li = document.createElement('li');
-        li.className = `task-item ${task.completed ? 'completed' : ''}`;
+        li.className = `task-item minimalist ${task.completed ? 'completed' : ''}`;
         li.onclick = () => editTask(task.id);
 
+        // Minimalistisk rad: titel, ev. prioritet, deadline-datum, tilldelad namn
         const isOverdue = task.deadline && new Date(task.deadline) < new Date() && !task.completed;
         const deadlineText = task.deadline ? new Date(task.deadline).toLocaleDateString('sv-SE') : '';
-
-        // Hämta assignee-namn om det finns
         let assigneeName = '';
         if (task.assignee) {
             assigneeName = await getAssigneeName(task.assignee);
         }
+        let metaParts = [];
+        if (task.priority !== 'medium') metaParts.push(`Prioritet: ${task.priority}`);
+        if (deadlineText) metaParts.push(`${deadlineText}${isOverdue ? ' (försenad)' : ''}`);
+        if (assigneeName) metaParts.push(escapeHtml(assigneeName));
 
         li.innerHTML = `
-            <div class="task-checkbox ${task.completed ? 'completed' : ''}" onclick="event.stopPropagation(); toggleTaskComplete('${task.id}')">
-                ${task.completed ? '✓' : ''}
-            </div>
-            <div class="task-content">
-                <div class="task-title">${escapeHtml(task.title)}</div>
-                <div class="task-meta">
-                    ${task.priority !== 'medium' ? `Prioritet: ${task.priority} • ` : ''}
-                    ${deadlineText ? `Deadline: ${deadlineText} ${isOverdue ? '(försenad)' : ''} • ` : ''}
-                    Skapad: ${new Date(task.created_at).toLocaleDateString('sv-SE')}
-                    ${assigneeName ? `• Tilldelad: ${escapeHtml(assigneeName)}` : ''}
-                </div>
-            </div>
-            <div class="task-actions">
-                <button class="task-action-btn" onclick="event.stopPropagation(); deleteTask('${task.id}')" title="Ta bort">🗑️</button>
-            </div>
+            <span class="task-checkbox minimalist ${task.completed ? 'completed' : ''}" onclick="event.stopPropagation(); toggleTaskComplete('${task.id}')">${task.completed ? '✓' : ''}</span>
+            <span class="task-title minimalist">${escapeHtml(task.title)}</span>
+            <span class="task-meta minimalist">${metaParts.join(' • ')}</span>
+            <span class="task-actions minimalist"><button class="task-action-btn" onclick="event.stopPropagation(); deleteTask('${task.id}')" title="Ta bort">🗑️</button></span>
         `;
         taskList.appendChild(li);
     });
-// Cache för användar-id till namn
-const assigneeNameCache = {};
+
 
 // Hämta användarnamn från Supabase/profiles
-async function getAssigneeName(userId) {
+window.getAssigneeName = async function(userId) {
     if (!userId) return '';
     if (assigneeNameCache[userId]) return assigneeNameCache[userId];
     try {

@@ -1,3 +1,13 @@
+/* Överskugga ramar och bakgrund för minimalistiska task-items */
+.task-item.minimalist, .task-item.minimalist:hover {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    margin-bottom: 0.25rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+}
 /* Synk-indikator till vänster om användare */
 .sync-indicator {
     display: inline-block;
