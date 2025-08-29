@@ -1,6 +1,6 @@
 // Supabase configuration
-const SUPABASE_URL = 'https://tazwiywfzpmyqbmmkhpc.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRhendpeXdmenBteXFibW1raHBjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTYxOTg2NzMsImV4cCI6MjA3MTc3NDY3M30.GwC80boqAj4Z78qt3BIG-iau1QJuZiFe058vWtFBCxg';
+const SUPABASE_URL = 'https://xatcagucuovqsgznjnae.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhhdGNhZ3VjdW92cXNnem5qbmFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY0ODU5NzksImV4cCI6MjA3MjA2MTk3OX0.QjnOKDruSkasrzA5zcYbS-ImyFNrcUqbNOefdYwLfZE';
 
 // Initialize Supabase client
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -199,11 +199,25 @@ async function logout() {
     try {
         const { error } = await supabase.auth.signOut();
         if (error) throw error;
-        
+        console.log('SignOut: Success, calling hideUserMenu and fallback to login screen.');
         hideUserMenu();
+        // Fallback: visa login-skärmen även om event inte triggar
+        setTimeout(() => {
+            if (document.getElementById('app-container').style.display !== 'none') {
+                console.warn('Fallback: Forcing login screen after logout.');
+                showLoginScreen();
+            }
+        }, 500);
     } catch (error) {
         console.error('Error signing out:', error);
         showMessage('Fel vid utloggning: ' + error.message);
+        // Fallback: visa login-skärmen även vid fel
+        setTimeout(() => {
+            if (document.getElementById('app-container').style.display !== 'none') {
+                console.warn('Fallback: Forcing login screen after logout error.');
+                showLoginScreen();
+            }
+        }, 500);
     }
 }
 

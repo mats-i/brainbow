@@ -161,6 +161,7 @@ async function createTask(taskData) {
 
     try {
         const result = await retryOperation(async () => {
+            console.log('Supabase INSERT newTask:', newTask);
             const { data, error } = await supabase
                 .from('tasks')
                 .insert(newTask)
