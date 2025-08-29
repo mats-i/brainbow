@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGoodApp - Task & Notes Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #f8f9fa;
+            color: #1d1d1f;
+            line-height: 1.4;
+        }
+
+        /* Login Screen Styles */
+        .login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .login-card {
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .login-title {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #1d1d1f;
+        }
+
+        .login-subtitle {
+            color: #666;
+            margin-bottom: 32px;
+            font-size: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            color: #424245;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #d1d1d6;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #007aff;
+        }
+
+        .auth-buttons {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: #007aff;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #0056cc;
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: #007aff;
+            border: 1px solid #007aff;
+        }
+
+        .btn-secondary:hover {
+            background: #007aff;
+            color: white;
+        }
+
+        .error-message {
+            color: #ff3b30;
+            font-size: 14px;
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        .success-message {
+            color: #34c759;
+            font-size: 14px;
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        /* App Container */
+        .app-container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: #fff;
+            border-right: 1px solid #e5e5e7;
+            display: flex;
+            flex-direction: column;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar.collapsed {
+            width: 60px;
+        }
+
+        .sidebar-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid #e5e5e7;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sidebar-header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1d1d1f;
+        }
+
+        .hamburger-btn {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+
+        .hamburger-btn:hover {
+            background: #f5f5f7;
+        }
+
+        .sidebar.collapsed .sidebar-header h1 {
+            display: none;
+        }
+
+        .project-list {
+            flex: 1;
+            padding: 8px 0;
+        }
+
+        .project-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 20px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 14px;
+            color: #424245;
+        }
+
+        .project-item:hover {
+            background: #f5f5f7;
+        }
+
+        .project-item.active {
+            background: #007aff;
+            color: white;
+        }
+
+        .project-item .icon {
+            margin-right: 12px;
+            font-size: 16px;
+            width: 20px;
+            text-align: center;
+        }
+
+        .project-item .name {
+            flex: 1;
+        }
+
+        .sidebar.collapsed .project-item .name {
+            display: none;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+            position: relative;
+        }
+
+        .main-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid #e5e5e7;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .main-header h2 {
+            font-size: 28px;
+            font-weight: 700;
+            color: #1d1d1f;
+        }
+
+        .user-menu {
+            position: relative;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #f5f5f7;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .user-avatar {
+            width: 28px;
+            height: 28px;
+            background: #007aff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 12px;
+        }
+
+        .dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            background: white;
+            border: 1px solid #e5e5e7;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            min-width: 160px;
+            z-index: 1000;
+            display: none;
+        }
+
+        .dropdown.show {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-size: 14px;
+        }
+
+        .dropdown-item:hover {
+            background: #f5f5f7;
+        }
+
+        .dropdown-item.danger {
+            color: #ff3b30;
+        }
+
+        /* Content Area */
+        .content-area {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        .add-task-btn {
+            background: #007aff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-bottom: 24px;
+            transition: background-color 0.2s;
+        }
+
+        .add-task-btn:hover {
+            background: #0056cc;
+        }
+
+        .task-form {
+            background: #fff;
+            border: 1px solid #e5e5e7;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            display: none;
+        }
+
+        .task-form.show {
+            display: block;
+        }
+
+        .task-form h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #1d1d1f;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .form-group {
+            flex: 1;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d1d6;
+            border-radius: 8px;
+            font-size: 14px;
+            background: #fff;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #007aff;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 16px;
+        }
+
+        .task-list {
+            list-style: none;
+        }
+
+        .task-item {
+            background: white;
+            border: 1px solid #e5e5e7;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .task-item:hover {
+            border-color: #007aff;
+            box-shadow: 0 2px 8px rgba(0, 122, 255, 0.1);
+        }
+
+        .task-checkbox {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #d1d1d6;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .task-checkbox.completed {
+            background: #34c759;
+            border-color: #34c759;
+            color: white;
+        }
+
+        .task-content {
+            flex: 1;
+        }
+
+        .task-title {
+            font-size: 15px;
+            font-weight: 500;
+            color: #1d1d1f;
+        }
+
+        .task-item.completed .task-title {
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+
+        .task-meta {
+            font-size: 12px;
+            color: #86868b;
+            margin-top: 4px;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 8px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .task-item:hover .task-actions {
+            opacity: 1;
+        }
+
+        .task-action-btn {
+            background: none;
+            border: none;
+            padding: 4px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        .task-action-btn:hover {
+            background: #f5f5f7;
+        }
+
+        .empty-state {
+            text-align: center;
+            color: #999;
+            padding: 60px 20px;
+        }
+
+        .empty-state h3 {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: absolute;
+                left: -280px;
+                z-index: 100;
+                height: 100vh;
+            }
+
+            .sidebar.show {
+                left: 0;
+            }
+
+            .form-row {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen" class="login-screen">
+        <div class="login-card">
+            <h1 class="login-title">AGoodApp</h1>
+            <p class="login-subtitle">Din personliga task & notes manager</p>
+            
+            <div id="login-form">
+                <div class="form-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" class="form-input" placeholder="din@email.se">
+                </div>
+                
+                <div class="form-group">
+                    <label for="login-password">Lösenord</label>
+                    <input type="password" id="login-password" class="form-input" placeholder="Minst 6 tecken">
+                </div>
+                
+                <div id="auth-message"></div>
+                
+                <div class="auth-buttons">
+                    <button id="signin-btn" class="btn btn-primary">Logga in</button>
+                    <button id="signup-btn" class="btn btn-secondary">Skapa konto</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app-container" class="app-container" style="display: none;">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h1>AGoodApp</h1>
+                <button class="hamburger-btn" onclick="toggleSidebar()">☰</button>
+            </div>
+            
+            <div class="project-list">
+                <div class="project-item active" data-project="all">
+                    <span class="icon">📋</span>
+                    <span class="name">Alla uppgifter</span>
+                </div>
+                <div class="project-item" data-project="work">
+                    <span class="icon">💼</span>
+                    <span class="name">Arbete</span>
+                </div>
+                <div class="project-item" data-project="personal">
+                    <span class="icon">🏠</span>
+                    <span class="name">Personligt</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="main-header">
+                <h2 id="main-title">Alla uppgifter</h2>
+                <div class="user-menu">
+                    <div class="user-info" onclick="toggleUserMenu()">
+                        <div class="user-avatar" id="user-avatar">U</div>
+                        <span id="user-name">User</span>
+                    </div>
+                    <div class="dropdown" id="user-dropdown">
+                        <div class="dropdown-item" onclick="showProfile()">Profil</div>
+                        <div class="dropdown-item danger" onclick="logout()">Logga ut</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="content-area">
+                <button class="add-task-btn" onclick="showTaskForm()">+ Ny uppgift</button>
+
+                <!-- Task Form -->
+                <div class="task-form" id="task-form">
+                    <h3>Ny uppgift</h3>
+                    
+                    <div class="form-group">
+                        <label>Uppgift</label>
+                        <input type="text" id="task-title" placeholder="Vad ska göras?">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Projekt</label>
+                            <select id="task-project">
+                                <option value="work">Arbete</option>
+                                <option value="personal">Personligt</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Prioritet</label>
+                            <select id="task-priority">
+                                <option value="low">Låg</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">Hög</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Deadline</label>
+                        <input type="date" id="task-deadline">
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button class="btn btn-secondary" onclick="hideTaskForm()">Avbryt</button>
+                        <button class="btn btn-primary" onclick="saveTask()">Spara</button>
+                    </div>
+                </div>
+
+                <!-- Task List -->
+                <ul class="task-list" id="task-list">
+                    <!-- Tasks will be populated here -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Simple Authentication System using localStorage
+        let currentUser = null;
+        let tasks = [];
+        let currentProject = 'all';
+
+        // Authentication functions
+        function showMessage(message, type = 'error') {
+            const messageEl = document.getElementById('auth-message');
+            messageEl.textContent = message;
+            messageEl.className = type === 'error' ? 'error-message' : 'success-message';
+            setTimeout(() => {
+                messageEl.textContent = '';
+                messageEl.className = '';
+            }, 3000);
+        }
+
+        function hashPassword(password) {
+            // Simple hash function (not secure for production!)
+            let hash = 0;
+            for (let i = 0; i < password.length; i++) {
+                const char = password.charCodeAt(i);
+                hash = ((hash << 5) - hash) + char;
+                hash = hash & hash; // Convert to 32bit integer
+            }
+            return hash.toString();
+        }
+
+        function validateEmail(email) {
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+        }
+
+        function signup() {
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
+
+            // Validation
+            if (!email || !password) {
+                showMessage('Fyll i både email och lösenord');
+                return;
+            }
+
+            if (!validateEmail(email)) {
+                showMessage('Ange en giltig email-adress');
+                return;
+            }
+
+            if (password.length < 6) {
+                showMessage('Lösenordet måste vara minst 6 tecken');
+                return;
+            }
+
+            // Check if user already exists
+            const users = JSON.parse(localStorage.getItem('agoodapp_users') || '{}');
+            if (users[email]) {
+                showMessage('En användare med denna email finns redan');
+                return;
+            }
+
+            // Create new user
+            users[email] = {
+                email: email,
+                password: hashPassword(password),
+                name: email.split('@')[0],
+                created: new Date().toISOString()
+            };
+
+            localStorage.setItem('agoodapp_users', JSON.stringify(users));
+            showMessage('Konto skapat! Du kan nu logga in.', 'success');
+        }
+
+        function signin() {
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
+
+            if (!email || !password) {
+                showMessage('Fyll i både email och lösenord');
+                return;
+            }
+
+            const users = JSON.parse(localStorage.getItem('agoodapp_users') || '{}');
+            const user = users[email];
+
+            if (!user || user.password !== hashPassword(password)) {
+                showMessage('Fel email eller lösenord');
+                return;
+            }
+
+            // Login successful
+            currentUser = user;
+            localStorage.setItem('agoodapp_current_user', JSON.stringify(user));
+            showMainApp();
+            loadTasks();
+        }
+
+        function logout() {
+            currentUser = null;
+            tasks = [];
+            localStorage.removeItem('agoodapp_current_user');
+            showLoginScreen();
+            hideUserMenu();
+        }
+
+        function showLoginScreen() {
+            document.getElementById('login-screen').style.display = 'flex';
+            document.getElementById('app-container').style.display = 'none';
+            document.getElementById('login-email').value = '';
+            document.getElementById('login-password').value = '';
+        }
+
+        function showMainApp() {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('app-container').style.display = 'flex';
+            updateUserInfo();
+        }
+
+        function updateUserInfo() {
+            if (!currentUser) return;
+            
+            document.getElementById('user-name').textContent = currentUser.name;
+            document.getElementById('user-avatar').textContent = currentUser.name.charAt(0).toUpperCase();
+        }
+
+        function toggleUserMenu() {
+            const dropdown = document.getElementById('user-dropdown');
+            dropdown.classList.toggle('show');
+        }
+
+        function hideUserMenu() {
+            document.getElementById('user-dropdown').classList.remove('show');
+        }
+
+        function showProfile() {
+            hideUserMenu();
+            alert(`Profil:\nEmail: ${currentUser.email}\nNamn: ${currentUser.name}\nMedlem sedan: ${new Date(currentUser.created).toLocaleDateString('sv-SE')}`);
+        }
+
+        // Task Management
+        function loadTasks() {
+            if (!currentUser) return;
+            
+            const userTasks = localStorage.getItem(`agoodapp_tasks_${currentUser.email}`);
+            tasks = userTasks ? JSON.parse(userTasks) : [];
+            renderTasks();
+        }
+
+        function saveTasks() {
+            if (!currentUser) return;
+            
+            localStorage.setItem(`agoodapp_tasks_${currentUser.email}`, JSON.stringify(tasks));
+        }
+
+        function generateId() {
+            return Date.now().toString(36) + Math.random().toString(36).substr(2);
+        }
+
+        function showTaskForm() {
+            document.getElementById('task-form').classList.add('show');
+            document.getElementById('task-title').focus();
+        }
+
+        function hideTaskForm() {
+            document.getElementById('task-form').classList.remove('show');
+            document.getElementById('task-title').value = '';
+            document.getElementById('task-project').value = 'work';
+            document.getElementById('task-priority').value = 'medium';
+            document.getElementById('task-deadline').value = '';
+        }
+
+        function saveTask() {
+            const title = document.getElementById('task-title').value.trim();
+            if (!title) return;
+
+            const task = {
+                id: generateId(),
+                title: title,
+                project: document.getElementById('task-project').value,
+                priority: document.getElementById('task-priority').value,
+                deadline: document.getElementById('task-deadline').value || null,
+                completed: false,
+                created: new Date().toISOString()
+            };
+
+            tasks.unshift(task);
+            saveTasks();
+            renderTasks();
+            hideTaskForm();
+        }
+
+        function toggleTaskComplete(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (task) {
+                task.completed = !task.completed;
+                task.completedAt = task.completed ? new Date().toISOString() : null;
+                saveTasks();
+                renderTasks();
+            }
+        }
+
+        function deleteTask(taskId) {
+            if (confirm('Är du säker på att du vill ta bort denna uppgift?')) {
+                tasks = tasks.filter(t => t.id !== taskId);
+                saveTasks();
+                renderTasks();
+            }
+        }
+
+        function renderTasks() {
+            const taskList = document.getElementById('task-list');
+            taskList.innerHTML = '';
+
+            let filteredTasks = tasks;
+            if (currentProject !== 'all') {
+                filteredTasks = tasks.filter(task => task.project === currentProject);
+            }
+
+            if (filteredTasks.length === 0) {
+                taskList.innerHTML = `
+                    <li class="empty-state">
+                        <h3>Inga uppgifter ännu</h3>
+                        <p>Skapa din första uppgift genom att klicka "+ Ny uppgift"</p>
+                    </li>
+                `;
+                return;
+            }
+
+            filteredTasks.forEach(task => {
+                const li = document.createElement('li');
+                li.className = `task-item ${task.completed ? 'completed' : ''}`;
+                
+                const isOverdue = task.deadline && new Date(task.deadline) < new Date() && !task.completed;
+                
+                li.innerHTML = `
+                    <div class="task-checkbox ${task.completed ? 'completed' : ''}" onclick="toggleTaskComplete('${task.id}')">
+                        ${task.completed ? '✓' : ''}
+                    </div>
+                    <div class="task-content">
+                        <div class="task-title">${task.title}</div>
+                        <div class="task-meta">
+                            ${task.priority !== 'medium' ? `Prioritet: ${task.priority} • ` : ''}
+                            ${task.deadline ? `Deadline: ${new Date(task.deadline).toLocaleDateString('sv-SE')} ${isOverdue ? '(försenad)' : ''} • ` : ''}
+                            Skapad: ${new Date(task.created).toLocaleDateString('sv-SE')}
+                        </div>
+                    </div>
+                    <div class="task-actions">
+                        <button class="task-action-btn" onclick="deleteTask('${task.id}')" title="Ta bort">🗑️</button>
+                    </div>
+                `;
+                taskList.appendChild(li);
+            });
+        }
+
+        function selectProject(project) {
+            currentProject = project;
+            
+            // Update active project
+            document.querySelectorAll('.project-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            document.querySelector(`[data-project="${project}"]`).classList.add('active');
+            
+            // Update title
+            const titles = {
+                'all': 'Alla uppgifter',
+                'work': 'Arbete',
+                'personal': 'Personligt'
+            };
+            document.getElementById('main-title').textContent = titles[project];
+            
+            renderTasks();
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            if (window.innerWidth <= 768) {
+                sidebar.classList.toggle('show');
+            } else {
+                sidebar.classList.toggle('collapsed');
+            }
+        }
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check if user is already logged in
+            const savedUser = localStorage.getItem('agoodapp_current_user');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                showMainApp();
+                loadTasks();
+            } else {
+                showLoginScreen();
+            }
+
+            // Event listeners
+            document.getElementById('signin-btn').addEventListener('click', signin);
+            document.getElementById('signup-btn').addEventListener('click', signup);
+            
+            // Enter key support
+            document.getElementById('login-email').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') signin();
+            });
+            document.getElementById('login-password').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') signin();
+            });
+            
+            // Project selection
+            document.querySelectorAll('.project-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    const project = this.getAttribute('data-project');
+                    selectProject(project);
+                });
+            });
+
+            // Close user menu when clicking outside
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.user-menu')) {
+                    hideUserMenu();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
