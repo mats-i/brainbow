@@ -1,3 +1,27 @@
+// Visa filterformulär i right-sidebar
+window.openFilterSidebar = function() {
+    const sidebar = document.getElementById('rightSidebar');
+    const filterForm = document.getElementById('filter-form-sidebar');
+    if (sidebar && filterForm) {
+        sidebar.classList.add('active');
+        filterForm.style.display = 'block';
+    }
+}
+
+// Stäng filterformulär och visa task-formulär igen
+window.closeFilterSidebar = function() {
+    const sidebar = document.getElementById('rightSidebar');
+    const filterForm = document.getElementById('filter-form-sidebar');
+    if (sidebar && filterForm) {
+        filterForm.style.display = 'none';
+    }
+}
+// Fallback: dummy-funktion för getAssigneeName om den inte finns
+if (!window.getAssigneeName) {
+    window.getAssigneeName = async (id) => id;
+}
+// Expose editTask globally for task item click handlers
+window.editTask = editTask;
 
 // Flikväxling för huvudflikarna
 window.selectTab = async function(tab) {
@@ -11,18 +35,19 @@ window.selectTab = async function(tab) {
         console.error('Kunde inte ladda tasks vid flikbyte:', e);
     }
     if (tab === 'calendar') {
-        renderTasksGroupedByDeadline();
+        await window.renderTasksGroupedByDeadline();
     } else if (tab === 'journal') {
         renderTasks();
     } else if (tab === 'who') {
-        renderTasksGroupedByAssignee();
+        await window.renderTasksGroupedByAssignee();
     } else if (tab === 'projects') {
-        await renderTasksGroupedByProject();
+        await window.renderTasksGroupedByProject();
     } else {
         document.getElementById('task-list').innerHTML = '<li class="empty-state"><h3>Ingen vy implementerad ännu</h3></li>';
     }
+};
 // Rendera tasks grupperade per projekt, sorterade i deadline-ordning (för fliken Projekt)
-function renderTasksGroupedByProject() {
+window.renderTasksGroupedByProject = async function renderTasksGroupedByProject() {
     const taskList = document.getElementById('task-list');
     if (!taskList) return;
     taskList.innerHTML = '';
@@ -55,7 +80,11 @@ function renderTasksGroupedByProject() {
             groupHeader.textContent = projectKey;
             taskList.appendChild(groupHeader);
             for (const task of group) {
-                const li = document.createElement('li');
+        // Reset priority to medium
+        setPriority('medium');
+        // Reset completed checkbox
+        const completedBox = document.getElementById('task-completed');
+        if (completedBox) completedBox.checked = false;
                 li.className = `task-item minimalist ${task.completed ? 'completed' : ''}`;
                 li.onclick = () => editTask(task.id);
                 let assigneeName = '';
@@ -77,7 +106,7 @@ function renderTasksGroupedByProject() {
         }
 }
 // Rendera tasks grupperade per tilldelad användare (för fliken Vem?)
-function renderTasksGroupedByAssignee() {
+window.renderTasksGroupedByAssignee = async function renderTasksGroupedByAssignee() {
     const taskList = document.getElementById('task-list');
     if (!taskList) return;
     taskList.innerHTML = '';
@@ -123,10 +152,37 @@ function renderTasksGroupedByAssignee() {
             });
         });
 }
+
+function renderTasks() {
+    console.log('[DEBUG] renderTasks() körs! window.tasks:', window.tasks ? window.tasks.length : 'undefined');
+    const taskList = document.getElementById('task-list');
+    if (!taskList) return;
+    taskList.innerHTML = '';
+    if (!window.tasks || window.tasks.length === 0) {
+        taskList.innerHTML = `<li class="empty-state"><h3>Inga uppgifter ännu</h3></li>`;
+        return;
+    }
+    // Visa alla tasks (ej grupperat)
+    window.tasks.forEach(task => {
+        const li = document.createElement('li');
+        li.className = `task-item minimalist ${task.completed ? 'completed' : ''}`;
+        li.onclick = () => editTask(task.id);
+        let metaParts = [];
+        if (task.priority && task.priority !== 'medium') metaParts.push(`Prioritet: ${task.priority}`);
+        if (task.assignee) metaParts.push(escapeHtml(task.assignee));
+        if (task.deadline) metaParts.unshift(new Date(task.deadline).toLocaleDateString('sv-SE'));
+        li.innerHTML = `
+            <span class="task-checkbox minimalist ${task.completed ? 'completed' : ''}" onclick="event.stopPropagation(); toggleTaskComplete('${task.id}')">${task.completed ? '✓' : ''}</span>
+            <span class="task-title minimalist">${escapeHtml(task.title)}</span>
+            <span class="task-meta minimalist">${metaParts.join(' • ')}</span>
+            <span class="task-actions minimalist"><button class="task-action-btn" onclick="event.stopPropagation(); deleteTask('${task.id}')" title="Ta bort">🗑️</button></span>
+        `;
+        taskList.appendChild(li);
+    });
 }
 
 // Rendera tasks grupperade på deadline (endast för kalenderfliken)
-function renderTasksGroupedByDeadline() {
+window.renderTasksGroupedByDeadline = async function renderTasksGroupedByDeadline() {
     const taskList = document.getElementById('task-list');
     if (!taskList) return;
     taskList.innerHTML = '';
@@ -176,6 +232,8 @@ function renderTasksGroupedByDeadline() {
         });
     });
 }
+if (typeof initializeUI === 'function') window.initializeUI = initializeUI;
+if (typeof showNotification === 'function') window.showNotification = showNotification;
 // Right sidebar state
 let currentEditingTask = null;
 let isEditMode = false;
@@ -183,12 +241,13 @@ let isEditMode = false;
 // Right sidebar functions
 function openRightSidebar(taskId = null) {
     const sidebar = document.getElementById('rightSidebar');
-    const overlay = document.getElementById('rightSidebarOverlay');
-    const container = document.getElementById('app-container');
     const title = document.getElementById('rightSidebarTitle');
     const deleteBtn = document.getElementById('deleteTaskBtn');
-
-    if (!sidebar || !overlay || !container) return;
+    if (!sidebar) return;
+    sidebar.classList.add('active');
+    // OBS! overlay används inte längre
+    // (tidigare: overlay.classList.add('active');)
+// (Redundant fallback för getAssigneeName borttagen ovan)
 
     // Ladda användarlistan till assignee-dropdown
     populateAssigneeDropdown();
@@ -243,8 +302,6 @@ async function populateAssigneeDropdown() {
 }
 
     sidebar.classList.add('active');
-    overlay.classList.add('active');
-    container.classList.add('sidebar-open');
     
     // Focus first input
     setTimeout(() => {
@@ -255,14 +312,8 @@ async function populateAssigneeDropdown() {
 
 function closeRightSidebar() {
     const sidebar = document.getElementById('rightSidebar');
-    const overlay = document.getElementById('rightSidebarOverlay');
-    const container = document.getElementById('app-container');
-
-    if (!sidebar || !overlay || !container) return;
-
+    if (!sidebar) return;
     sidebar.classList.remove('active');
-    overlay.classList.remove('active');
-    container.classList.remove('sidebar-open');
     
     // Clear form after animation
     setTimeout(() => {
@@ -291,6 +342,54 @@ function loadTaskIntoSidebar(task) {
     
     // Set priority
     setPriority(task.priority || 'medium');
+    // Set completed checkbox
+    const completedBox = document.getElementById('task-completed');
+    if (completedBox) completedBox.checked = !!task.completed;
+
+    // Fyll historikmodul (alltid synlig)
+    const historyDiv = document.getElementById('task-history-sidebar');
+    if (historyDiv) {
+        let html = '<div style="font-weight:bold; margin-bottom:0.5em;">Historik</div>';
+        let hasData = false;
+        if (task.created_at || task.updated_at || task.completed_at) {
+            html += `<div><b>Skapad:</b> ${formatDateTime(task.created_at)}${task.created_by ? ' av ' + getUserName(task.created_by) : ''}</div>`;
+            html += `<div><b>Senast ändrad:</b> ${formatDateTime(task.updated_at)}${task.updated_by ? ' av ' + getUserName(task.updated_by) : ''}</div>`;
+            if (task.completed_at) {
+                html += `<div><b>Avslutad:</b> ${formatDateTime(task.completed_at)}${task.completed_by ? ' av ' + getUserName(task.completed_by) : ''}</div>`;
+            }
+            hasData = true;
+        }
+        if (!hasData) {
+            html += '<div style="color:#888;">historik saknas…</div>';
+        }
+        historyDiv.innerHTML = html;
+        historyDiv.style.display = 'block';
+    }
+}
+
+// Hjälpfunktioner för historik
+function formatDateTime(dt) {
+    if (!dt) return '-';
+    const d = new Date(dt);
+    return d.toLocaleDateString('sv-SE') + ' ' + d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' });
+}
+function getUserName(userId) {
+    if (!userId) return '';
+    // Använd global getAssigneeName om den finns
+    if (window.getAssigneeName) {
+        // getAssigneeName är async, men historikmodulen kan använda sync fallback först
+        let cached = window.assigneeNameCache && window.assigneeNameCache[userId];
+        if (cached) return cached;
+        // Starta async uppslag och uppdatera modulen när klart
+        window.getAssigneeName(userId).then(name => {
+            // Uppdatera alla historikmoduler där userId visas
+            document.querySelectorAll('.task-history').forEach(div => {
+                div.innerHTML = div.innerHTML.replace(userId, name);
+            });
+        });
+        return userId;
+    }
+    return userId;
 }
 
 function clearSidebarForm() {
@@ -326,7 +425,6 @@ function setPriority(priority) {
         if (option.dataset.priority === priority) {
             option.classList.add('selected');
         }
-                        if (task.deadline) metaParts.unshift(new Date(task.deadline).toLocaleDateString('sv-SE'));
     });
 }
 
@@ -351,6 +449,7 @@ async function saveTaskFromSidebar() {
     }
 
     // Extra säkerhet: om taskData.assignee fortfarande är 'me', byt ut det
+    const completedCheckbox = document.getElementById('task-completed');
     const taskData = {
         title: title.value.trim(),
         description: getFieldValue('task-description'),
@@ -358,27 +457,45 @@ async function saveTaskFromSidebar() {
         priority: getSelectedPriority(),
         deadline: getFieldValue('task-deadline') || null,
         assignee: assigneeValue,
-        tags: getFieldValue('task-tags')
+        tags: getFieldValue('task-tags'),
+        completed: completedCheckbox ? completedCheckbox.checked : false
     };
     if (taskData.assignee === 'me' && window.currentUser && window.currentUser.id) {
         taskData.assignee = window.currentUser.id;
     }
 
+    // Disable save/cancel buttons to prevent double actions
+    const saveBtn = document.querySelector('.sidebar-btn-primary');
+    const cancelBtn = document.querySelector('.sidebar-btn-secondary');
+    const loader = document.getElementById('sidebar-loader');
+    if (saveBtn) saveBtn.disabled = true;
+    if (cancelBtn) cancelBtn.disabled = true;
+    if (loader) loader.style.display = 'flex';
+    let closeTimeout;
     try {
         if (isEditMode && currentEditingTask) {
             await updateTask(currentEditingTask.id, taskData);
         } else {
             await createTask(taskData);
         }
-
         renderTasks();
         updateProjectCounts();
-        closeRightSidebar();
-        
     } catch (error) {
         console.error('Error saving task:', error);
         alert('Fel vid sparande: ' + error.message);
+    } finally {
+        // Always close panel, even if async hangs (max 3s)
+        closeTimeout = setTimeout(() => {
+            console.warn('Force closing sidebar after timeout');
+            closeRightSidebar();
+        }, 3000);
+        closeRightSidebar();
+        if (loader) loader.style.display = 'none';
+        if (saveBtn) saveBtn.disabled = false;
+        if (cancelBtn) cancelBtn.disabled = false;
+        clearTimeout(closeTimeout);
     }
+    console.log('closeRightSidebar called');
 }
 
 async function deleteCurrentTask() {

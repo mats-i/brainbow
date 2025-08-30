@@ -1,3 +1,4 @@
+console.log('window.showTaskLoader finns:', typeof window.showTaskLoader);
 // Supabase configuration
 const SUPABASE_URL = 'https://xatcagucuovqsgznjnae.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhhdGNhZ3VjdW92cXNnem5qbmFlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY0ODU5NzksImV4cCI6MjA3MjA2MTk3OX0.QjnOKDruSkasrzA5zcYbS-ImyFNrcUqbNOefdYwLfZE';
@@ -63,6 +64,7 @@ async function initAuth() {
             } catch (e) {
                 console.error('Kunde inte ladda tasks vid inloggning:', e);
             }
+            if (window.loadUserFilters) await window.loadUserFilters();
             updateSyncStatus('synced', 'Ansluten');
         } else {
             showLoginScreen();
@@ -81,6 +83,7 @@ async function initAuth() {
                 } catch (e) {
                     console.error('Kunde inte ladda tasks vid SIGNED_IN:', e);
                 }
+                if (window.loadUserFilters) await window.loadUserFilters();
                 updateSyncStatus('synced', 'Ansluten');
             } else if (event === 'SIGNED_OUT') {
                 currentUser = null;
@@ -243,6 +246,7 @@ function showLoginScreen() {
 function showMainApp() {
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app-container').style.display = 'flex';
+    console.log('showMainApp: satte display:flex på #app-container');
     const syncStatus = document.getElementById('sync-status');
     if (syncStatus) syncStatus.style.display = 'block';
 }

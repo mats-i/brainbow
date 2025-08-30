@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Brainbow - Task & Notes Manager</title>
     <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 </head>
 <body>
     <!-- Login Screen -->
@@ -31,11 +32,17 @@
                     <button id="signup-btn" class="btn btn-secondary">Skapa konto</button>
                 </div>
             </div>
+            <!-- Historikmodul -->
+            <div class="form-group">
+                <div id="task-history-sidebar" class="task-history" style="display:block; background:#f8f9fa; border-radius:6px; padding:1em; font-size:0.95em;">
+                    <!-- Historikdata fylls i via JS -->
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- Main App -->
-    <div id="app-container" class="app-container" style="display: none;">
+    <div id="app-container" class="app-container">
         <!-- Left Sidebar -->
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
@@ -45,20 +52,109 @@
             
             <div class="project-list">
                 <div class="project-item active" data-project="all">
-                    <span class="icon">📋</span>
+                    <span class="icon"><i class="fa-solid fa-list-check" aria-hidden="true"></i></span>
                     <span class="name">Alla uppgifter</span>
                     <span class="project-count" id="count-all">0</span>
                 </div>
                 <div class="project-item" data-project="work">
-                    <span class="icon">💼</span>
+                    <span class="icon"><i class="fa-solid fa-briefcase" aria-hidden="true"></i></span>
                     <span class="name">Arbete</span>
                     <span class="project-count" id="count-work">0</span>
                 </div>
                 <div class="project-item" data-project="personal">
-                    <span class="icon">🏠</span>
+                    <span class="icon"><i class="fa-solid fa-house" aria-hidden="true"></i></span>
                     <span class="name">Personligt</span>
                     <span class="project-count" id="count-personal">0</span>
                 </div>
+                <div class="sidebar-section">
+                    <div class="sidebar-section-header" style="display: flex; align-items: center; justify-content: space-between; margin-top: 1rem;">
+                        <span>Filter</span>
+                        <button id="add-filter-btn" title="Nytt filter" style="font-size: 1.2em; padding: 0 6px;">+</button>
+                    </div>
+                    <ul id="filter-list" class="sidebar-list"></ul>
+                </div>
+    <!-- Filter modal -->
+    <!-- Filterformulär i right-sidebar -->
+    <div id="filter-form-sidebar" style="display:none; padding:1em;">
+        <h2>Skapa filter</h2>
+        <form id="filter-form">
+            <label for="filter-name">Namn</label>
+            <input type="text" id="filter-name" name="filter-name" required>
+            <label for="filter-project">Projekt</label>
+            <select id="filter-project" name="filter-project">
+                <option value="">Alla</option>
+                <option value="work">Arbete</option>
+                <option value="personal">Personligt</option>
+            </select>
+            <label for="filter-assignee">Tilldelad</label>
+            <input type="text" id="filter-assignee" name="filter-assignee" placeholder="Användar-ID eller namn">
+            <label for="filter-status">Status</label>
+            <select id="filter-status" name="filter-status">
+                <option value="">Alla</option>
+                <option value="open">Öppen</option>
+                <option value="completed">Klar</option>
+            </select>
+            <label for="filter-priority">Prioritet</label>
+            <select id="filter-priority" name="filter-priority">
+                <option value="">Alla</option>
+                <option value="high">Hög</option>
+                <option value="medium">Mellan</option>
+                <option value="low">Låg</option>
+            </select>
+            <label for="filter-tags">Taggar</label>
+            <input type="text" id="filter-tags" name="filter-tags" placeholder="t.ex. #möte, #viktigt">
+            <label for="filter-date-from">Från datum</label>
+            <input type="date" id="filter-date-from" name="filter-date-from">
+            <label for="filter-date-to">Till datum</label>
+            <input type="date" id="filter-date-to" name="filter-date-to">
+            <label for="filter-group">Gruppera efter</label>
+            <select id="filter-group" name="filter-group">
+                <option value="">Ingen</option>
+                <option value="project">Projekt</option>
+                <option value="assignee">Tilldelad</option>
+                <option value="priority">Prioritet</option>
+            </select>
+            <label for="filter-sort">Sortera efter</label>
+            <select id="filter-sort" name="filter-sort">
+                <option value="created_at">Skapad</option>
+                <option value="deadline">Deadline</option>
+                <option value="priority">Prioritet</option>
+            </select>
+            <button type="submit">Spara filter</button>
+        </form>
+    </div>
+    <script src="js/filters.js"></script>
+    <script>
+    // Öppna filterformulär i right-sidebar
+    document.getElementById('add-filter-btn').onclick = function() {
+        if (window.openFilterSidebar) window.openFilterSidebar();
+    };
+    // Spara filter
+    document.getElementById('filter-form').onsubmit = async function(e) {
+        e.preventDefault();
+        const filter = {
+            name: document.getElementById('filter-name').value,
+            project: document.getElementById('filter-project').value,
+            assignee: document.getElementById('filter-assignee').value,
+            status: document.getElementById('filter-status').value,
+            priority: document.getElementById('filter-priority').value,
+            tags: document.getElementById('filter-tags').value,
+            date_from: document.getElementById('filter-date-from').value || null,
+            date_to: document.getElementById('filter-date-to').value || null,
+            groupby: document.getElementById('filter-group').value,
+            sortby: document.getElementById('filter-sort').value
+        };
+        await saveUserFilter(filter);
+        document.getElementById('filter-modal').style.display = 'none';
+        this.reset();
+    };
+    // Ladda filter vid inloggning
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.currentUser) loadUserFilters();
+    });
+    </script>
+        </div>
+    </div>
             </div>
         </div>
 
@@ -109,6 +205,9 @@
         </div>
 
         <div class="right-sidebar-content">
+            <div id="sidebar-loader" style="display:none; position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(255,255,255,0.7); z-index:10; align-items:center; justify-content:center;">
+                <div style="margin:auto; font-size:1.2em; color:#888;">Sparar...</div>
+            </div>
             <div class="form-group">
                 <label for="task-title">Titel</label>
                 <input type="text" id="task-title" class="form-input" placeholder="Vad ska göras?">
@@ -154,6 +253,11 @@
                 <label for="task-tags">Taggar</label>
                 <input type="text" id="task-tags" class="form-input" placeholder="urgent, review, frontend...">
             </div>
+            <div class="form-group">
+                <div id="task-history-sidebar" class="task-history" style="display:block; background:#f8f9fa; border-radius:6px; padding:1em; font-size:0.95em;">
+                    <!-- Historikdata fylls i via JS -->
+                </div>
+            </div>
         </div>
 
         <div class="right-sidebar-actions">
@@ -165,8 +269,8 @@
 
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.7/dist/umd/supabase.min.js"></script>
-    <script src="js/auth.js"></script>
     <script src="js/tasks.js"></script>
+    <script src="js/auth.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/main.js"></script>
 </body>

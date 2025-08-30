@@ -1,3 +1,90 @@
+/* --- FLEXBOX LAYOUT OVERRIDE FOR DEBUG --- */
+html, body {
+    height: 100%;
+    width: 100%;
+    min-height: 100vh;
+    min-width: 100vw;
+    margin: 0;
+    padding: 0;
+}
+
+#app-container, .app-container {
+    display: flex !important;
+    flex-direction: row !important;
+    height: 100vh !important;
+    width: 100vw !important;
+    align-items: stretch !important;
+    flex-wrap: nowrap !important;
+}
+
+.sidebar {
+    height: 100vh !important;
+}
+
+.main-content {
+    height: 100vh !important;
+}
+/* --- FLEX LAYOUT: Only one set of robust rules for app layout --- */
+.app-container {
+    display: flex;
+    flex-direction: row;
+    height: 100vh;
+    width: 100vw;
+    align-items: stretch;
+    flex-wrap: nowrap;
+}
+
+.sidebar {
+    flex-shrink: 0;
+    width: 280px;
+    min-width: 60px;
+    max-width: 100vw;
+    position: relative;
+    z-index: 2;
+    height: 100vh;
+}
+
+.main-content {
+    flex: 1 1 0%;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 1;
+    height: 100vh;
+    overflow: auto;
+}
+/* Snygg filter-lista i sidomenyn */
+.sidebar-list-item {
+    padding: 8px 12px;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+.sidebar-list-item:hover, .sidebar-list-item.active {
+    background: #f5f5f7;
+}
+.sidebar-list-item .icon {
+    width: 20px;
+    text-align: center;
+    color: #007aff;
+    font-size: 1.1em;
+}
+.sidebar-list-item .name {
+    flex: 1;
+    font-size: 1em;
+    color: #222;
+}
+/* Dölj papperskorgsikonen i aktivitetslistan */
+/* Make the delete button in the edit sidebar much smaller */
+#deleteTaskBtn.sidebar-btn-danger {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    min-width: unset;
+    min-height: unset;
+    height: 24px;
+    line-height: 1.1;
+}
 /* Överskugga ramar och bakgrund för minimalistiska task-items */
 .task-item.minimalist, .task-item.minimalist:hover {
     background: none !important;
@@ -165,26 +252,14 @@ body {
 }
 
 /* App Container */
-.app-container {
-    display: flex;
-    height: 100vh;
-    overflow: hidden;
-    transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-}
+
 
 .app-container.sidebar-open {
     transform: translateX(-150px);
 }
 
 /* Left Sidebar */
-.sidebar {
-    width: 280px;
-    background: #fff;
-    border-right: 1px solid #e5e5e7;
-    display: flex;
-    flex-direction: column;
-    transition: all 0.3s ease;
-}
+
 
 .sidebar.collapsed {
     width: 60px;
@@ -272,13 +347,7 @@ body {
 }
 
 /* Main Content */
-.main-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    background: #fff;
-    position: relative;
-}
+
 
 .main-header {
     padding: 20px 24px;
@@ -286,12 +355,16 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    transition: width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .main-header h2 {
     font-size: 28px;
     font-weight: 700;
     color: #1d1d1f;
+    transition: width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .user-menu {
@@ -384,6 +457,10 @@ body {
     flex: 1;
     padding: 24px;
     overflow-y: auto;
+    background: #e1f7ff !important;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
 }
 
 .add-task-btn {
